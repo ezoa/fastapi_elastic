@@ -1,0 +1,77 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.15.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+    env_file:
+      - .env
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    networks:
+      - school_management_network
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.15.0
+    container_name: logstash
+    volumes:
+      - ./logstash/config/logstash.conf:/usr/share/logstash/config/logstash.conf
+      - ./app_logs:/usr/share/logstash/logs/app_logs
+    ports:
+      - "5044:5044"
+    environment:
+      - "LS_JAVA_OPTS=-Xmx256m -Xms256m"
+      - xpack.monitoring.enabled=false
+      - ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME}
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD} 
+
+    env_file:
+      - .env
+    networks:
+      - school_management_network
+    depends_on:
+      - elasticsearch
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.15.0 
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=${ELASTICSEARCH_USERNAME}
+      - ELASTICSEARCH_PASSWORD=${ELASTICSEARCH_PASSWORD}
+    env_file:
+      - .env
+    volumes:
+      - kibana-data:/usr/share/kibana/data
+    networks:
+      - school_management_network
+    depends_on:
+      - elasticsearch
+  web:
+    build: .
+    container_name: fastapi_school_manager
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    networks:
+      - school_management_network
+volumes:
+
+  es-data:
+    driver: local
+  kibana-data: 
+    driver: local
+
+networks:
+  school_management_network:
+    driver: bridge
+    
+
